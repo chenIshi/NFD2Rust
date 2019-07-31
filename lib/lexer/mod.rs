@@ -48,6 +48,7 @@ named!(lesser_operator_equal<CompleteByteSlice, Token>,
   do_parse!(tag!("<=") >> (Token::LessThanEqual))
 );
 
+/*
 named!(greater_operator<CompleteByteSlice, Token>,
   do_parse!(tag!(">") >> (Token::GreaterThan))
 );
@@ -55,6 +56,7 @@ named!(greater_operator<CompleteByteSlice, Token>,
 named!(lesser_operator<CompleteByteSlice, Token>,
   do_parse!(tag!("<") >> (Token::LessThan))
 );
+*/
 
 named!(logicNot_operator<CompleteByteSlice, Token>,
   do_parse!(tag!("~") >> (Token::LogicNot))
@@ -81,9 +83,7 @@ named!(lex_operator<CompleteByteSlice, Token>, alt!(
     logicAnd_operator |
     logicOr_operator |
     greater_operator_equal |
-    lesser_operator_equal |
-    greater_operator |
-    lesser_operator
+    lesser_operator_equal
 ));
 
 //* punctuations
@@ -123,6 +123,14 @@ named!(rbracket_punctuation<CompleteByteSlice, Token>,
   do_parse!(tag!("]") >> (Token::RBracket))
 );
 
+named!(langlebracket_punctuation<CompleteByteSlice, Token>,
+  do_parse!(tag!("<") >> (Token::LAngleBracket))
+);
+
+named!(ranglebracket_punctuation<CompleteByteSlice, Token>,
+  do_parse!(tag!(">") >> (Token::RAngleBracket))
+);
+
 named!(lex_punctuations<CompleteByteSlice, Token>, alt!(
     comma_punctuation |
     semicolon_punctuation |
@@ -132,7 +140,9 @@ named!(lex_punctuations<CompleteByteSlice, Token>, alt!(
     lbrace_punctuation |
     rbrace_punctuation |
     lbracket_punctuation |
-    rbracket_punctuation
+    rbracket_punctuation |
+    langlebracket_punctuation |
+    ranglebracket_punctuation
 ));
 
 /* parse IP */
@@ -211,6 +221,8 @@ fn parse_reserved(c: CompleteStr, rest: Option<CompleteStr>) -> Token {
     let mut string = c.0.to_owned();
     string.push_str(rest.unwrap_or(CompleteStr("")).0);
     match string.as_ref() {
+        "int" => Token::Int,
+        "ip" => Token::Ip,
         "program" => Token::Program,
         "rule" => Token::Rule,
         "map" => Token::Map,
@@ -232,7 +244,6 @@ fn parse_reserved(c: CompleteStr, rest: Option<CompleteStr>) -> Token {
         "flag_syn" => Token::Flag_syn,
         "flag_ack" => Token::Flag_ack,
         "flag_fin" => Token::Flag_fin,
-        "f" => Token::Packet,
         _ => Token::Ident(string),
     }
 }
@@ -328,13 +339,13 @@ mod tests {
           Token::LBrace,
           Token::Match_flow,
           Token::LBrace,
-          Token::Packet,
+          Token::Ident("f".to_owned()),
           Token::Mismatch,
           Token::Ident("ALLOW".to_owned()),
           Token::RBrace,
           Token::Match_state,
           Token::LBrace,
-          Token::Packet,
+          Token::Ident("f".to_owned()),
           Token::LBracket,
           Token::Sip,
           Token::RBracket,
@@ -346,5 +357,22 @@ mod tests {
         ];
 
         assert_eq!(result, expected_results);
+    }
+
+    #[test]
+    fn assign_lexer() {
+        let input = "int port = 8 + 10;".as_bytes();
+        let (_, result) = Lexer::lex_tokens(input).unwrap();
+        let expected_results = vec![
+          Token::Int,
+          Token::Ident("port".to_owned()),
+          Token::Assign,
+          Token::IntLiteral(8),
+          Token::Plus,
+          Token::IntLiteral(10),
+          Token::SemiColon,
+          Token::EOF,
+        ];
+
     }
 }

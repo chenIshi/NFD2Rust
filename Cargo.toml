@@ -1,12 +1,15 @@
 [package]
-name = "NFD-Rust"
+name = "nfd-rust"
 version = "0.1.0"
 authors = ["chenishi <chen.ishi@gmail.com>"]
-edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "nfd2rust_lib"
+path = "lib/nfd2rust.rs"
+
 [dependencies]
 pnet = "0.22.0"
-nom = "5.0.0"
+nom = "^4.0.0"
 jemallocator = "0.3.2"

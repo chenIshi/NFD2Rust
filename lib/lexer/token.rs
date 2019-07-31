@@ -14,8 +14,10 @@ pub enum Token {
     terminal token */
     //* statements
     Assign,
+    /*
     If,
     Else,
+    */
     //* operators
     Plus,
     Minus,
@@ -26,8 +28,10 @@ pub enum Token {
     NotEqual,
     GreaterThanEqual,
     LessThanEqual,
+    /*
     GreaterThan,
     LessThan,
+    */
     LogicNot,
     LogicAnd,
     LogicOr,
@@ -57,8 +61,6 @@ pub enum Token {
     Flag_syn,
     Flag_ack,
     Flag_fin,
-    /* "f" in the model */
-    Packet,
     //* punctuations
     Comma,
     Colon,
@@ -69,6 +71,10 @@ pub enum Token {
     RBrace,
     LBracket,
     RBracket,
+    LAngleBracket,
+    RAngleBracket,
+    Int,
+    Ip,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
