@@ -16,12 +16,14 @@ pub enum Expr {
     InfixExpr(Infix, Box<Expr>, Box<Expr>),
     ListExpr(Vec<Expr>),
     IndexExpr { array: Box<Expr>, index: Box<Expr>},
-    MapExpr(Type, Type),
-    MatchFlowExpr {control: MatchControl, rule: Box<Expr>},
+    MapInstanceExpr(Literal, Literal),
+    MapTypeExpr(Type, Type),
+    MatchFlowExpr(MatchControl, Box<Expr>),
     RuleExpr(PacketFlag, Literal),
     PacketFlagExpr(PacketFlag),
     ActionFlowExpr(ActionControl, BlockStmt),
-    EntryExpr(BlockStmt),
+    EntryExpr(Vec<Expr>),
+    ActionExpr(FlowAction),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -64,6 +66,8 @@ pub enum PacketFlag {
     Sport,
     Dport,
     Iplen,
+    Tcp,
+    Udp,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -88,6 +92,7 @@ pub enum Infix {
     Divide,
     Multiply,
     Module,
+    Assign,
     Equal,
     NotEqual,
     GreaterThanEqual,
@@ -104,6 +109,7 @@ pub enum Infix {
 #[derive(PartialEq, PartialOrd, Debug, Clone)]
 pub enum Precedence {
     PLowest,
+    PArrange,
     PLogic,
     PRule,
     PEquals,

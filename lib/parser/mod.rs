@@ -158,6 +158,8 @@ macro_rules! parse_flag (
                 Token::Flag_syn => Ok((i1, PacketFlag::Syn)),
                 Token::Flag_ack => Ok((i1, PacketFlag::Ack)),
                 Token::Flag_fin => Ok((i1, PacketFlag::Fin)),
+                Token::Tcp => Ok((i1, PacketFlag::Tcp)),
+                Token::Udp => Ok((i1, PacketFlag::Udp)),
                 Token::Sip => Ok((i1, PacketFlag::Sip)),
                 Token::Dip => Ok((i1, PacketFlag::Dip)),
                 Token::Sport => Ok((i1, PacketFlag::Sport)),
@@ -179,6 +181,7 @@ fn infix_op(t: &Token) -> (Precedence, Option<Infix>) {
         Token::Match => (Precedence::PRule, Some(Infix::RuleMatch)),
         Token::Mismatch => (Precedence::PRule, Some(Infix::RuleMismatch)),
         Token::In => (Precedence::PRule, Some(Infix::In)),
+        Token::Assign => (Precedence::PArrange, Some(Infix::Assign)),
         Token::Equal => (Precedence::PEquals, Some(Infix::Equal)),
         Token::NotEqual => (Precedence::PEquals, Some(Infix::NotEqual)),
         Token::LessThanEqual => (Precedence::PLessGreater, Some(Infix::LessThanEqual)),
@@ -195,11 +198,11 @@ fn infix_op(t: &Token) -> (Precedence, Option<Infix>) {
 
 named!(parse_program<Tokens, Program>,
     do_parse!(
-        // tag_token!(Token::Program) >>
-        // programID: parse_ident!() >>
-        // tag_token!(Token::LBrace) >>
+        tag_token!(Token::Program) >>
+        programID: parse_ident!() >>
+        tag_token!(Token::LBrace) >>
         prog: many0!(parse_stmt) >>
-        // tag_token!(Token::RBrace) >>
+        tag_token!(Token::RBrace) >>
         tag_token!(Token::EOF) >>
         (prog)
     )
@@ -245,17 +248,18 @@ named!(parse_block_stmt<Tokens, BlockStmt>,
 /* fundamental expr non-tokens */
 
 named!(parse_atom_expr<Tokens, Expr>, alt_complete!(
-    parse_lit_expr |
-    parse_ident_expr |
     parse_prefix_expr |
     parse_paren_expr |
-    parse_map_expr |
+    parse_map_type_expr |
     parse_list_expr |
     parse_match_flow_expr |
     parse_action_flow_expr |
     parse_rule_expr |
     parse_entry_expr |
-    parse_flag_expr
+    parse_flag_expr |
+    parse_action_expr | 
+    parse_lit_expr |
+    parse_ident_expr
 ));
 
 named!(parse_paren_expr<Tokens, Expr>,
@@ -312,13 +316,32 @@ named!(parse_list_expr<Tokens, Expr>,
     )
 );
 
+named!(parse_map_instance_expr<Tokens, Expr>,
+    do_parse!(
+        key: parse_literal!() >>
+        tag_token!(Token::Colon) >>
+        value: parse_literal!() >>
+        (Expr::MapInstanceExpr(key, value))
+    )
+);
+
 /* NFD related expr */
 
 named!(parse_entry_expr<Tokens, Expr>,
     do_parse!(
         tag_token!(Token::Entry) >>
-        ss: parse_block_stmt >>
+        tag_token!(Token::LBrace) >>
+        ss: many0!(parse_expr) >>
+        tag_token!(Token::RBrace) >>
         (Expr::EntryExpr(ss))
+    )
+);
+
+/* Drop or Pass */
+named!(parse_action_expr<Tokens, Expr>,
+    do_parse!(
+        act: parse_flow_action!() >>
+        (Expr::ActionExpr(act))
     )
 );
 
@@ -328,7 +351,7 @@ named!(parse_match_flow_expr<Tokens, Expr>,
         tag_token!(Token::LBrace) >>
         e: parse_expr >>
         tag_token!(Token::RBrace) >>
-        (Expr::MatchFlowExpr { control: ctl, rule: Box::new(e)})
+        (Expr::MatchFlowExpr (ctl, Box::new(e)))
     )
 );
 
@@ -340,7 +363,7 @@ named!(parse_action_flow_expr<Tokens, Expr>,
     )
 );
 
-named!(parse_map_expr<Tokens, Expr>,
+named!(parse_map_type_expr<Tokens, Expr>,
     do_parse!(
         tag_token!(Token::Map) >>
         tag_token!(Token::LAngleBracket) >>
@@ -349,7 +372,7 @@ named!(parse_map_expr<Tokens, Expr>,
         b: parse_type!() >>
         tag_token!(Token::RAngleBracket) >>
         opt!(tag_token!(Token::SemiColon)) >>
-        (Expr::MapExpr(a, b))
+        (Expr::MapTypeExpr(a, b))
     )
 );
 
@@ -479,17 +502,19 @@ mod tests {
         assert_eq!(result, expected_results);
     }
 
+
     #[test]
     fn assign_parser() {
-        let input = "rule R=sip:\"192.168.0.0/16\";
-                    IP base=\"219.168.135.100/32\";
-                    int port=8;".as_bytes();
+        let input = "program assign_parser {
+                    rule R=sip:\"192.168.0.0/16\";
+                    IP base = \"219.168.135.100/32\";
+                    int port = 8;
+                    }".as_bytes();
 
-        let program: Program =
-            vec![
+        let program: Program = vec![
                 Stmt::AssignStmt(Type::RuleType,
                                 Ident("R".to_owned()),
-                                Expr::LitExpr(Literal::IpLiteral("192.168.0.0/16".to_owned()))
+                                Expr::RuleExpr(PacketFlag::Sip, Literal::IpLiteral("192.168.0.0/16".to_owned())),
                                 ),
                 Stmt::AssignStmt(Type::IpType,
                                 Ident("base".to_owned()),
@@ -500,6 +525,7 @@ mod tests {
                                 Expr::LitExpr(Literal::IntLiteral(8))
                                 ),
             ];
+            
 
         assert_input_with_program(input, program);
     }
@@ -507,10 +533,11 @@ mod tests {
    
     #[test]
     fn calc_then_assign() {
-        let input = "int port = 8 + 10;".as_bytes();
+        let input = "program calc_then_assign { 
+            int port = 8 + 10;
+            }".as_bytes();
 
-        let program: Program = 
-            vec![
+        let program: Program = vec![
                 Stmt::AssignStmt(Type::IntType,
                                 Ident("port".to_owned()),
                                 Expr::InfixExpr(
@@ -519,6 +546,115 @@ mod tests {
                                 Box::new(Expr::LitExpr(Literal::IntLiteral(10))),
                                 )),
             ];
+            
+        assert_input_with_program(input, program);
+    }
+
+    #[test]
+    fn match_parser() {
+        let input = "program match_parser {
+                    entry {
+                        matchFlow{f matches R}
+                        matchState{f[dport] in listIP}
+                    }}
+                    ".as_bytes();
+        let program: Program = vec![
+                Stmt::ExprStmt(Expr::EntryExpr(
+                    vec![
+                        Expr::MatchFlowExpr(MatchControl::MatchFlow, 
+                        Box::new(Expr::InfixExpr(Infix::RuleMatch,
+                            Box::new(Expr::IdentExpr(Ident("f".to_owned()))),
+                            Box::new(Expr::IdentExpr(Ident("R".to_owned())))),
+                        )),
+                        Expr::MatchFlowExpr(MatchControl::MatchState,
+                        Box::new(Expr::InfixExpr(Infix::In,
+                            Box::new(Expr::IndexExpr {
+                                array: Box::new(Expr::IdentExpr(Ident("f".to_owned()))),
+                                index: Box::new(Expr::PacketFlagExpr(PacketFlag::Dport)),
+                            }),
+                            Box::new(Expr::IdentExpr(Ident("listIP".to_owned()))),
+                        ))),
+                    ],
+                )),
+            ];
+            
+
+        assert_input_with_program(input, program);    
+    }
+
+    #[test]
+    fn action_parser() {
+        let input = "program action_parser {
+                    entry {
+                        actionFlow{pass;}
+                        actionState{hh[f[sip]]=1;}
+                    }}
+                    ".as_bytes();
+
+        let program: Program = vec![
+                Stmt::ExprStmt(Expr::EntryExpr(
+                    vec![
+                        Expr::ActionFlowExpr(ActionControl::ActionFlow, vec![
+                            Stmt::ExprStmt(Expr::ActionExpr(FlowAction::PassFlow)),
+                        ]),
+                        Expr::ActionFlowExpr(ActionControl::ActionState, vec![
+                            Stmt::ExprStmt(Expr::InfixExpr(
+                                Infix::Assign,
+                                Box::new(Expr::IndexExpr {
+                                    array: Box::new(Expr::IdentExpr(Ident("hh".to_owned()))),
+                                    index: Box::new(Expr::IndexExpr{
+                                        array: Box::new(Expr::IdentExpr(Ident("f".to_owned()))),
+                                        index: Box::new(Expr::PacketFlagExpr(PacketFlag::Sip)),
+                                    }),
+                                }),
+                                Box::new(Expr::LitExpr(IntLiteral(1))),
+                            )),
+                        ]),
+                    ]
+                )),
+            ];
+            
+
+        assert_input_with_program(input, program);
+    }
+
+    #[test]
+    fn stateless_firewall() {
+        let input = "program IDS{
+                                    rule ALLOW = sip:\"192.168.22.0/24\";
+                                    entry {
+                                        match_flow { f matches ALLOW }
+                                    }
+                                    entry {
+                                        match_flow { f mismatches ALLOW }
+                                        action_flow { DROP; }
+                                    }
+                                }".as_bytes();
+
+        let program = vec![
+            Stmt::AssignStmt(Type::RuleType,
+                                Ident("ALLOW".to_owned()),
+                                Expr::RuleExpr(PacketFlag::Sip, Literal::IpLiteral("192.168.22.0/24".to_owned())),
+                                ),
+            Stmt::ExprStmt(Expr::EntryExpr(vec![
+                                Expr::MatchFlowExpr(MatchControl::MatchFlow, Box::new(
+                                    Expr::InfixExpr(Infix::RuleMatch,
+                                    Box::new(Expr::IdentExpr(Ident("f".to_owned()))),
+                                    Box::new(Expr::IdentExpr(Ident("ALLOW".to_owned()))),
+                                )))])),
+            Stmt::ExprStmt(Expr::EntryExpr(vec![
+                                Expr::MatchFlowExpr(MatchControl::MatchFlow, Box::new(
+                                    Expr::InfixExpr(Infix::RuleMismatch,
+                                    Box::new(Expr::IdentExpr(Ident("f".to_owned()))),
+                                    Box::new(Expr::IdentExpr(Ident("ALLOW".to_owned()))))
+                                )),
+                                Expr::ActionFlowExpr(ActionControl::ActionFlow, vec![
+                                    Stmt::ExprStmt(Expr::ActionExpr(FlowAction::DropFlow)),
+                                ]),
+            ]))
+        ];
+
         assert_input_with_program(input, program);
     }
 }
+

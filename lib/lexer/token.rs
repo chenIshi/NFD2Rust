@@ -58,6 +58,8 @@ pub enum Token {
     Sport,
     Dport,
     Iplen,
+    Tcp,
+    Udp,
     Flag_syn,
     Flag_ack,
     Flag_fin,

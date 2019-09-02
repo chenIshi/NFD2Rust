@@ -11,5 +11,7 @@ path = "lib/nfd2rust.rs"
 
 [dependencies]
 pnet = "0.22.0"
+ipnet="2.0.0"
 nom = "^4.0.0"
 jemallocator = "0.3.2"
+clap = "~2.31.2"

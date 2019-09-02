@@ -9,3 +9,7 @@ Originally trying to do it with LLVM will be my first thought, however, I am not
 
 1. Use `Rust Stable` instead of `Rust nightly`
 2. Use 2015 version instead of 2018 version
+
+## Semantic Twicks
+    
+    1. use quote on IP like "192.168.0.1"

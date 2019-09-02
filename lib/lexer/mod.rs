@@ -192,18 +192,18 @@ named!(lex_IP<CompleteByteSlice, Token>,
 );
 
 macro_rules! check(
-  ($input:expr, $submac:ident!( $($args:tt)* )) => (
-    {
-      use std::result::Result::*;
-      use nom::{Err,ErrorKind};
+    ($input:expr, $submac:ident!( $($args:tt)* )) => (
+       {
+          use std::result::Result::*;
+          use nom::{Err,ErrorKind};
 
-      let mut failed = false;
-      for &idx in $input.0 {
-        if !$submac!(idx, $($args)*) {
-            failed = true;
-            break;
+          let mut failed = false;
+          for &idx in $input.0 {
+          if !$submac!(idx, $($args)*) {
+              failed = true;
+              break;
+          }
         }
-      }
       if failed {
         let e: ErrorKind<u32> = ErrorKind::Tag;
         Err(Err::Error(error_position!($input, e)))
@@ -222,7 +222,7 @@ fn parse_reserved(c: CompleteStr, rest: Option<CompleteStr>) -> Token {
     string.push_str(rest.unwrap_or(CompleteStr("")).0);
     match string.as_ref() {
         "int" => Token::Int,
-        "ip" => Token::Ip,
+        "IP" => Token::Ip,
         "program" => Token::Program,
         "rule" => Token::Rule,
         "map" => Token::Map,
@@ -235,7 +235,9 @@ fn parse_reserved(c: CompleteStr, rest: Option<CompleteStr>) -> Token {
         "actionFlow" => Token::Action_flow,
         "actionState" => Token::Action_state,
         "DROP" => Token::Drop_flow,
-        "PASS" => Token::Pass_flow,
+        "pass" => Token::Pass_flow,
+        "TCP" => Token::Tcp,
+        "UDP" => Token::Udp,
         "sip" => Token::Sip,
         "dip" => Token::Dip,
         "sport" => Token::Sport,
@@ -361,18 +363,85 @@ mod tests {
 
     #[test]
     fn assign_lexer() {
-        let input = "int port = 8 + 10;".as_bytes();
+        let input = "IP base =\"219.168.135.100/32\";".as_bytes();
         let (_, result) = Lexer::lex_tokens(input).unwrap();
         let expected_results = vec![
-          Token::Int,
-          Token::Ident("port".to_owned()),
+          Token::Ip,
+          Token::Ident("base".to_owned()),
           Token::Assign,
-          Token::IntLiteral(8),
-          Token::Plus,
-          Token::IntLiteral(10),
+          Token::IpLiteral("219.168.135.100/32".to_owned()),
           Token::SemiColon,
           Token::EOF,
         ];
+        assert_eq!(result, expected_results);
+    }
 
+    #[test]
+    fn match_lexer() {
+        let input = "entry {
+                        matchFlow{f matches R}
+                        matchState{f[dport] in listIP}
+                    }
+                    ".as_bytes();
+        let (_, result) = Lexer::lex_tokens(input).unwrap();
+        let expected_results = vec![
+          Token::Entry,
+          Token::LBrace,
+          Token::Match_flow,
+          Token::LBrace,
+          Token::Ident("f".to_owned()),
+          Token::Match,
+          Token::Ident("R".to_owned()),
+          Token::RBrace,
+          Token::Match_state,
+          Token::LBrace,
+          Token::Ident("f".to_owned()),
+          Token::LBracket,
+          Token::Dport,
+          Token::RBracket,
+          Token::In,
+          Token::Ident("listIP".to_owned()),
+          Token::RBrace,
+          Token::RBrace,
+          Token::EOF,
+        ];
+  
+        assert_eq!(result, expected_results);
+    }
+
+    #[test]
+    fn action_lexer() {
+      let input = "entry {
+                        actionFlow{pass;}
+                        actionState{hh[f[sip]]=1;}
+                    }
+                    ".as_bytes();
+      let (_, result) = Lexer::lex_tokens(input).unwrap();
+      let expected_results = vec![
+        Token::Entry,
+        Token::LBrace,
+        Token::Action_flow,
+        Token::LBrace,
+        Token::Pass_flow,
+        Token::SemiColon,
+        Token::RBrace,
+        Token::Action_state,
+        Token::LBrace,
+        Token::Ident("hh".to_owned()),
+        Token::LBracket,
+        Token::Ident("f".to_owned()),
+        Token::LBracket,
+        Token::Sip,
+        Token::RBracket,
+        Token::RBracket,
+        Token::Assign,
+        Token::IntLiteral(1),
+        Token::SemiColon,
+        Token::RBrace,
+        Token::RBrace,
+        Token::EOF,
+      ];
+
+      assert_eq!(result, expected_results);
     }
 }
