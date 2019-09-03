@@ -7,9 +7,16 @@ Originally trying to do it with LLVM will be my first thought, however, I am not
 
 ## QuickStart Guide
 
-1. Use `Rust Stable` instead of `Rust nightly`
-2. Use 2015 version instead of 2018 version
+    1. Use `Rust Stable` instead of `Rust nightly`
+    2. Use 2015 version instead of 2018 version
+    3. run `cargo build`
+    4. run `sudo /home/chenishi/.cargo/bin/cargo run -- --src models/stateless_firewall.txt --net [*network-interface*]`
+    or `sudo target/debug/nfd-rust --src models/stateless_firewall.txt --net wlp2s0`
+    the previous command require the path to cargo since cargo is not in the root group, and you need to specify the available network interface
+    (You can use `ifconfig` to console)
+    5. you might require to tweak the model (to conform with the `semantic tweaks` below) in order to pass the compiler parser 
 
-## Semantic Twicks
+## Semantic Tweaks
     
     1. use quote on IP like "192.168.0.1"
+    2. translate "match_flow"-like syntax to "matchFlow"
